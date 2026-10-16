@@ -1,4 +1,6 @@
 from pathlib import Path
+from difflib import SequenceMatcher
+import re
 import shutil
 
 HISTOLOGY = Path(
@@ -7,13 +9,26 @@ HISTOLOGY = Path(
 DESTINATION = HISTOLOGY / "collected_stitched"
 
 
+def is_stitched_folder(name):
+    """Recognize stitched suffixes with spelling/separator variations."""
+    last_word = re.split(r"[\s_-]+", name.lower().strip())[-1]
+    known_spellings = {
+        "stitched", "stiched", "sticthed", "stithced",
+        "stithed", "stitche", "stitch",
+    }
+    return (
+        last_word in known_spellings
+        or SequenceMatcher(None, last_word, "stitched").ratio() >= 0.75
+    )
+
+
 def find_stitched_folders(parent):
     """Find stitched folders without searching inside matched folders."""
     for folder in sorted(parent.iterdir()):
         if not folder.is_dir() or folder == DESTINATION:
             continue
 
-        if folder.name.lower().endswith("-stitched"):
+        if is_stitched_folder(folder.name):
             yield folder
         else:
             yield from find_stitched_folders(folder)
@@ -44,7 +59,7 @@ def main():
             stitched_folders.append((stitched, relative_path, file_count))
 
     if not stitched_folders:
-        print("No folders ending in '-stitched' were found.")
+        print("No stitched folders (including spelling variations) were found.")
         return
 
     print(f"{'Folder (relative to histology)':<90} {'Files':>8}")
